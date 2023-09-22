@@ -1,0 +1,7 @@
+static/generated_image
+static/labels
+static/real_image
+static/mask
+static/prompt.csv
+venv
+.DS_STORE
