@@ -8,7 +8,7 @@ import zipfile
 app = Flask(__name__)
 
 IMAGE_DIR = os.path.join('static', 'generated_image')
-LABEL_DIR = os.path.join('static', 'bg_labels')
+LABEL_DIR = os.path.join('static', 'labels_v2')
 
 os.makedirs(LABEL_DIR, exist_ok=True)
 
@@ -119,7 +119,7 @@ def zipdir(path, ziph):
 @app.route('/download-json', methods=['POST'])
 def downloadJson():
     with zipfile.ZipFile('data.zip', 'w', zipfile.ZIP_DEFLATED) as zipf:
-        zipdir('static/bg_labels/', zipf)
+        zipdir('static/labels_v2/', zipf)
 
     return send_file('data.zip', as_attachment=True)
 
