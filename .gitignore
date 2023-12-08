@@ -1,7 +1,11 @@
-static/generated_image
-static/labels
-static/real_image
-static/mask
-static/prompt.csv
+predicted_hole
+result/*
 venv
-.DS_STORE
+weekly
+paper
+img
+.idea
+.DS_store
+calASVS.py
+compute_accuracy.py
+vgg19.py
