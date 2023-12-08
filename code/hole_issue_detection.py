@@ -277,5 +277,5 @@ def main():
 			json.dump(data, f, ensure_ascii=False, indent=2)
 
 # model, centerbias_template = load_deepgazeII()	
-model = torchvision.models.vgg19(pretrained=True)
+# model = torchvision.models.vgg19(pretrained=True)
 main()
