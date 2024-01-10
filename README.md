@@ -10,8 +10,8 @@
     python hole_issue_detection.py --image "image_folder" --mask "mask_folder" --output "output_folder"
     ```
     
-2. Otherwise, you can simply use the "hole_issue_detection" function. Pass in a image_path and a mask_path, it will generate a score ranging from -1 to 1. -1 means with hole issue, 1 means without hole issue(the score is calculated by the correlation of saliencyMap's histogram).
+2. Otherwise, you can simply use the "hole_issue_detection" function. Pass in a image_path and a mask_path, it will generate 0 or 1 where 0 means without hole_issue, 1 means with hole_issue.
     ```
-    hole_issue_detection(image_path, mask_path) -> score
+    hole_issue_detection(image_path, mask_path) -> 1 or 0
     ```
 
