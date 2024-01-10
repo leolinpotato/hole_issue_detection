@@ -13,7 +13,7 @@ from PIL import Image
 from scipy.ndimage import zoom
 from scipy.special import logsumexp
 import  matplotlib.pyplot as plt
-import deepgaze_pytorch
+# import deepgaze_pytorch
 import json
 import os
 from natsort import natsorted
@@ -30,14 +30,18 @@ args = ap.parse_args()
 
 sz = 224
 
+np.set_printoptions(threshold=np.inf)  # Display all array elements
+
 
 ### Below are different ways to get saliency map ###
 
 def VGG19(image_path):
+	image = cv2.imread(image_path)
 	for param in model.parameters():
 		param.requires_grad = False
 
 	img = Image.open(image_path)
+
 
 	# Preprocess the image
 	def preprocess(image, size=224):
@@ -86,6 +90,7 @@ def VGG19(image_path):
 	resized_tensor = saliency[0].tolist()
 	return np.array(resized_tensor)
 
+'''
 def load_deepgazeII():
 	# you can use DeepGazeI or DeepGazeIIE
 	model = deepgaze_pytorch.DeepGazeIIE(pretrained=True)
@@ -110,6 +115,7 @@ def deepgazeII(image_path):
 	image_np = log_density_prediction.squeeze().detach().numpy()
 	saliency_map_normalized = cv2.normalize(image_np, None, 0, 1, cv2.NORM_MINMAX)
 	return saliency_map_normalized
+'''
 
 def opencvSpectralResidual(image_path):
 	image = cv2.resize(cv2.imread(image_path), (sz, sz))
@@ -131,12 +137,12 @@ def calculate_ASVS(saliencyMap, region):
 	# remove unreasonable region
 	for i in range(len(region)):
 		for j in range(len(region[0])):
-			region[i][j] = region[i][j] if region[i][j] == 1 else 0
-	matrix = saliencyMap * region
+			region[i][j] = 1 if region[i][j] == 1 else 0
+	matrix = saliencyMap * region / 255
 	area = cv2.countNonZero(region)
 	return pow(LA.norm(matrix), 2) / area
 
-def get_mask(mask):
+def get_mask(mask, DiEr=False):
 	mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
 	# revert color(0 to 1, 1 to 0)
 	for i in range(len(mask)):
@@ -147,9 +153,10 @@ def get_mask(mask):
 				mask[i][j] = 0
 	# try to capture hole which is not entirely closed
 	mask_copy = mask.copy()
-	# kernel = np.ones((10, 10), np.uint8)
-	# mask_copy = cv2.dilate(mask_copy, kernel, iterations=1)
-	# mask_copy = cv2.erode(mask_copy, kernel, iterations=1)
+	if DiEr:
+		kernel = np.ones((8, 8), np.uint8)
+		mask_copy = cv2.dilate(mask_copy, kernel, iterations=1)
+		mask_copy = cv2.erode(mask_copy, kernel, iterations=1)
 
 	# find the border
 	def compute_mask_border(mask):
@@ -219,10 +226,28 @@ def hole_issue_detection(image_path, mask_path):
 			if hole[row][i] != 1:
 				hole[row][i] = 0
 	area = np.sum(hole)
-	if area < sz * sz / 500:  # without hole
-		return 1
+	print(area)
+	if area < sz * sz / 300:  # without hole
+		omask, fmask, emask = get_mask(mask, DiEr=True)
+		bgmask = np.ones((sz, sz)) - omask
+		# check whether contains hole
+		hole = (fmask - omask).astype("uint8")
+		for row in range(len(hole)):
+			for i in range(len(hole[0])):
+				if hole[row][i] != 1:
+					hole[row][i] = 0
+		area = np.sum(hole)
+		print('enclose area: ', area)
+		if area < sz * sz / 100:
+			return 1, 1, 1
 
 	# have hole, need to compute ASVS to check have issue or not
+	kernel = np.ones((8, 8), np.uint8)
+	hole_erode = cv2.erode(hole, kernel, iterations=1)
+	hole_edge = hole - hole_erode
+	# cv2.imshow('hole', hole * 255)
+	# cv2.imshow('hole_edge', hole_edge * 255)
+	# cv2.waitKey(0)
 
 	# saliencyMap = function(), can pass in different function, and the return value is normalized between 0 and 1
 	saliencyMap = opencvFineGrained(image_path)
@@ -243,10 +268,10 @@ def hole_issue_detection(image_path, mask_path):
 
 	similarity = cv2.compareHist(hist_hole, hist_border, cv2.HISTCMP_CORREL)
 
-	# hole_ASVS = calculate_ASVS(saliencyMap, fmask - omask)
-	# border_ASVS = calculate_ASVS(saliencyMap, emask - fmask)
+	hole_ASVS = calculate_ASVS(saliencyMap, hole)
+	border_ASVS = calculate_ASVS(saliencyMap, border)
 	# return hole_ASVS / border_ASVS if hole_ASVS / border_ASVS <= 1 else border_ASVS / hole_ASVS
-	return similarity
+	return similarity, hole_ASVS, border_ASVS
 
 # only need to change function used in "hole_issue_detection" and the name of the result file
 def main():
@@ -256,25 +281,32 @@ def main():
 	sorted_mask = natsorted(os.listdir(mask))
 	cnt = -1
 	for file_name in tqdm(sorted_image, desc="Processing files", total=len(sorted_image)):
-		if file_name not in sorted_mask or file_name[0] == '.':
+		if f'{file_name.split("_")[0]}.png' not in sorted_mask or file_name[0] == '.':
 			continue
 		cnt += 1
 		# obj_name = file_name.split('_')[0]  # get the object name, "bag_1.png" we get "bag"
 		if args.debug and cnt % 10:  # if debugging, only choose 1/40 of images
 			continue
-		with open(f'{args.output}/{file_name.split(".")[0]}.json', 'w') as f:
+		with open(f'{args.output}/{file_name}.json', 'w') as f:
 			print(f'{image}/{file_name}', f'{mask}/{file_name}')
-			similarity = hole_issue_detection(f'{image}/{file_name}', f'{mask}/{file_name}')
-			if similarity > 0.5:  # 0.5 is a threshold, which can be modified
-				hole_issue = False
-			else:
-				hole_issue = True
+			similarity, hole_ASVS, border_ASVS = hole_issue_detection(f'{image}/{file_name}', f'{mask}/{file_name.split("_")[0]}.png')
+			# if similarity > 0.5:  # 0.5 is a threshold, which can be modified
+			# 	hole_issue = False
+			# else:
+			# 	hole_issue = True
+			# data = {
+			# 	"product_hole_issue": hole_issue,
+			# 	"similarity": similarity
+			# }
+			# data["product_hole_issue"] = bool(data["product_hole_issue"])
 			data = {
-				"product_hole_issue": hole_issue,
-				"similarity": similarity
+				"similarity": similarity,
+				"hole_ASVS": hole_ASVS,
+				"border_ASVS": border_ASVS,
 			}
-			data["product_hole_issue"] = bool(data["product_hole_issue"])
 			json.dump(data, f, ensure_ascii=False, indent=2)
+		if args.debug:
+			break
 
 # model, centerbias_template = load_deepgazeII()	
 # model = torchvision.models.vgg19(pretrained=True)
