@@ -239,7 +239,7 @@ def hole_issue_detection(image_path, mask_path):
 		area = np.sum(hole)
 		print('enclose area: ', area)
 		if area < sz * sz / 100:
-			return 1, 1, 1
+			return 0
 
 	# have hole, need to compute ASVS to check have issue or not
 	kernel = np.ones((8, 8), np.uint8)
@@ -270,8 +270,10 @@ def hole_issue_detection(image_path, mask_path):
 
 	hole_ASVS = calculate_ASVS(saliencyMap, hole)
 	border_ASVS = calculate_ASVS(saliencyMap, border)
-	# return hole_ASVS / border_ASVS if hole_ASVS / border_ASVS <= 1 else border_ASVS / hole_ASVS
-	return similarity, hole_ASVS, border_ASVS
+	r = 1.3
+	t = 0.03
+	return 1 if hole_ASVS / border_ASVS > r or hole_ASVS - border_ASVS > t else 0  # 1 means with hole_issue, 0 means without hole_issue
+	# return similarity, hole_ASVS, border_ASVS
 
 # only need to change function used in "hole_issue_detection" and the name of the result file
 def main():
@@ -289,7 +291,8 @@ def main():
 			continue
 		with open(f'{args.output}/{file_name}.json', 'w') as f:
 			print(f'{image}/{file_name}', f'{mask}/{file_name}')
-			similarity, hole_ASVS, border_ASVS = hole_issue_detection(f'{image}/{file_name}', f'{mask}/{file_name.split("_")[0]}.png')
+			value = hole_issue_detection(f'{image}/{file_name}', f'{mask}/{file_name.split("_")[0]}.png')
+			# similarity, hole_ASVS, border_ASVS = hole_issue_detection(f'{image}/{file_name}', f'{mask}/{file_name.split("_")[0]}.png')
 			# if similarity > 0.5:  # 0.5 is a threshold, which can be modified
 			# 	hole_issue = False
 			# else:
@@ -299,10 +302,13 @@ def main():
 			# 	"similarity": similarity
 			# }
 			# data["product_hole_issue"] = bool(data["product_hole_issue"])
+			# data = {
+			# 	"similarity": similarity,
+			# 	"hole_ASVS": hole_ASVS,
+			# 	"border_ASVS": border_ASVS,
+			# }
 			data = {
-				"similarity": similarity,
-				"hole_ASVS": hole_ASVS,
-				"border_ASVS": border_ASVS,
+				"hole_issue": value,
 			}
 			json.dump(data, f, ensure_ascii=False, indent=2)
 		if args.debug:
