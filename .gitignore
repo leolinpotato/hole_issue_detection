@@ -1,11 +1,9 @@
-predicted_hole
-result/*
+result
+dataset
+others
+code/TranSalNet/pretrained_models
 venv
-weekly
-paper
-img
 .idea
 .DS_store
-calASVS.py
-compute_accuracy.py
-vgg19.py
+.python-version
+script.sh
