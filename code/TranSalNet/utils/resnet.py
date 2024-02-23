@@ -294,7 +294,7 @@ def _resnet(
     model = ResNet(block, layers, **kwargs)
     if pretrained:
         if arch == 'resnet50':
-            state_dict = torch.load(r'pretrained_models/resnet50-0676ba61.pth')
+            state_dict = torch.load(r'TranSalNet/pretrained_models/resnet50-0676ba61.pth')
         else:
             state_dict = load_state_dict_from_url(model_urls[arch], progress=progress)
         model.load_state_dict(state_dict)

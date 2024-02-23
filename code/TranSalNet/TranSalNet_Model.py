@@ -11,7 +11,6 @@ from natsort import natsorted
 from tqdm import tqdm
 import torch
 from pysaliency.plotting import visualize_distribution
-
 from torchvision import transforms, utils, models
 import torch.nn as nn
 from utils.data_process import preprocess_img, postprocess_img
